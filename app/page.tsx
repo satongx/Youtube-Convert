@@ -1,95 +1,53 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client'
 
-export default function Home() {
+import { useState } from 'react'
+import { FileUploader } from './components/FileUploader'
+import { MP3List } from './components/MP3List'
+import { Music } from 'lucide-react'
+
+export default function ConvertPage() {
+  const [mp3Files, setMp3Files] = useState<string[]>([])
+
+  const onConversionSuccess = (fileName: string) => {
+    setMp3Files(prev => [...prev, fileName])
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>app/page.tsx</code>.
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
+      <div className="max-w-4xl mx-auto p-8">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <div className="flex items-center justify-center mb-4">
+            <Music className="w-12 h-12 text-blue-500" />
+          </div>
+          <h1 className="text-4xl font-bold text-gray-800 mb-2">
+            YouTube to MP3 Converter
+          </h1>
+          <p className="text-gray-600">
+            Convert your favorite YouTube videos to MP3 in seconds
+          </p>
         </div>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+        {/* Converter Card */}
+        <div className="bg-white rounded-2xl shadow-xl p-6 mb-8">
+          <FileUploader onSuccess={onConversionSuccess} />
+        </div>
+
+        {/* History Card */}
+        {mp3Files.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-xl p-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              Conversion History
+            </h2>
+            <MP3List files={mp3Files} />
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <footer className="text-center py-6 text-gray-500 text-sm">
+        <p>Convert YouTube videos to MP3 format safely and easily</p>
       </footer>
-    </div>
-  );
+    </main>
+  )
 }
