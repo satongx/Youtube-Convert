@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link, Download } from 'lucide-react'
 
 export function FileUploader({ onSuccess }: { onSuccess: (fileName: string) => void }) {
@@ -9,16 +9,18 @@ export function FileUploader({ onSuccess }: { onSuccess: (fileName: string) => v
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [progress, setProgress] = useState<number>(0)
   const [status, setStatus] = useState<string>('')
+  const [videoTitle, setVideoTitle] = useState<string>('')
 
-  // Function to poll progress
   const pollProgress = async () => {
+    if (!isUploading) return
+    
     try {
       const response = await fetch('/api/progress')
       const data = await response.json()
       setProgress(data.progress)
       setStatus(data.status)
       
-      if (data.status !== 'complete' && isUploading) {
+      if (data.status !== 'Complete!') {
         setTimeout(pollProgress, 1000)
       }
     } catch (error) {
@@ -32,7 +34,7 @@ export function FileUploader({ onSuccess }: { onSuccess: (fileName: string) => v
 
     setIsUploading(true)
     setProgress(0)
-    setStatus('Starting download...')
+    setStatus('Starting...')
     setDownloadUrl(null)
 
     try {
@@ -54,13 +56,15 @@ export function FileUploader({ onSuccess }: { onSuccess: (fileName: string) => v
         throw new Error(errorData.error || 'Conversion failed')
       }
 
+      // Get filename from Content-Disposition header
+      const disposition = response.headers.get('Content-Disposition')
+      const filename = disposition?.split('filename=')[1]?.replace(/"/g, '') || 'audio.mp3'
+      setVideoTitle(filename)
+
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       setDownloadUrl(url)
-      
-      const videoId = youtubeUrl.split('v=')[1]?.split('&')[0] || 'video'
-      onSuccess(`${videoId}.mp3`)
-      setYoutubeUrl('')
+      onSuccess(filename)
       setStatus('Complete!')
       setProgress(100)
     } catch (error) {
@@ -76,37 +80,32 @@ export function FileUploader({ onSuccess }: { onSuccess: (fileName: string) => v
     if (!downloadUrl) return
     const a = document.createElement('a')
     a.href = downloadUrl
-    a.download = 'converted.mp3'
+    a.download = videoTitle || 'converted.mp3'
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
+    window.URL.revokeObjectURL(downloadUrl)
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col items-center">
-        <div className="w-full max-w-md">
-          <form onSubmit={handleYoutubeSubmit} className="flex gap-2">
-            <div className="flex-1">
-              <input
-                type="text"
-                value={youtubeUrl}
-                onChange={(e) => setYoutubeUrl(e.target.value)}
-                placeholder="Paste YouTube URL here"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={isUploading}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={isUploading || !youtubeUrl.trim()}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Link className="w-5 h-5" />
-            </button>
-          </form>
-        </div>
-      </div>
+      <form onSubmit={handleYoutubeSubmit} className="flex gap-2">
+        <input
+          type="text"
+          value={youtubeUrl}
+          onChange={(e) => setYoutubeUrl(e.target.value)}
+          placeholder="Paste YouTube URL here"
+          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          disabled={isUploading}
+        />
+        <button
+          type="submit"
+          disabled={isUploading || !youtubeUrl.trim()}
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Link className="w-5 h-5" />
+        </button>
+      </form>
 
       {isUploading && (
         <div className="text-center">

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { writeFile, unlink, readFile } from 'fs/promises'
+import { writeFile, unlink, readFile, mkdir } from 'fs/promises'
 import ytdl from 'ytdl-core'
 import ffmpeg from 'fluent-ffmpeg'
 import { join } from 'path'
@@ -23,8 +23,12 @@ export async function POST(request: Request) {
     const videoInfo = await ytdl.getBasicInfo(youtubeUrl)
     const sanitizedTitle = videoInfo.videoDetails.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()
 
-    const inputPath = join('/tmp', `youtube-${Date.now()}.mp4`)
-    const outputPath = join('/tmp', `${sanitizedTitle}.mp3`)
+    // Create uploads directory if it doesn't exist
+    const uploadDir = join(process.cwd(), 'uploads')
+    await mkdir(uploadDir, { recursive: true })
+
+    const inputPath = join(uploadDir, `youtube-${Date.now()}.mp4`)
+    const outputPath = join(uploadDir, `${sanitizedTitle}.mp3`)
 
     console.log('Downloading to:', inputPath)
     updateProgress(0, 'Starting download...')
