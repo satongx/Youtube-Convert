@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { writeFile, unlink, readFile, mkdir } from 'fs/promises'
-import ytdl from 'ytdl-core'
+import { stream, video_info } from 'play-dl'
 import ffmpeg from 'fluent-ffmpeg'
 import { join } from 'path'
 import { updateProgress } from '@/app/lib/progress'
@@ -8,99 +8,72 @@ import { updateProgress } from '@/app/lib/progress'
 export async function POST(request: Request) {
   try {
     const { youtubeUrl } = await request.json()
+    
     if (!youtubeUrl) {
       return NextResponse.json({ error: 'No YouTube URL provided' }, { status: 400 })
     }
 
-    console.log('Starting conversion for:', youtubeUrl)
-    updateProgress(0, 'Getting video info...')
-
-    // Validate YouTube URL
-    if (!ytdl.validateURL(youtubeUrl)) {
-      return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 })
-    }
-
-    const videoInfo = await ytdl.getBasicInfo(youtubeUrl)
-    const sanitizedTitle = videoInfo.videoDetails.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()
-
-    // Create uploads directory if it doesn't exist
+    // Create directory
     const uploadDir = join(process.cwd(), 'uploads')
     await mkdir(uploadDir, { recursive: true })
 
-    const inputPath = join(uploadDir, `youtube-${Date.now()}.mp4`)
-    const outputPath = join(uploadDir, `${sanitizedTitle}.mp3`)
+    const timestamp = Date.now()
+    const inputPath = join(uploadDir, `input-${timestamp}.mp4`)
+    const outputPath = join(uploadDir, `output-${timestamp}.mp3`)
 
-    console.log('Downloading to:', inputPath)
+    // Get video info
+    const videoInfo = await video_info(youtubeUrl)
+    
+    // Download
     updateProgress(0, 'Starting download...')
-
-    // Download with progress
-    await new Promise((resolve, reject) => {
-      ytdl(youtubeUrl, {
-        quality: 'lowestaudio',
-        filter: 'audioonly'
-      })
-        .on('progress', (_, downloaded, total) => {
-          const progress = Math.floor((downloaded / total) * 100)
-          console.log(`Download progress: ${progress}%`)
-          updateProgress(progress, 'Downloading...')
-        })
-        .on('error', (error) => {
-          console.error('Download error:', error)
-          reject(error)
-        })
-        .pipe(require('fs').createWriteStream(inputPath))
-        .on('finish', () => {
-          console.log('Download completed')
-          resolve(null)
-        })
-        .on('error', (error: Error) => {
-          console.error('File write error:', error)
-          reject(error)
-        })
+    const audioStream = await stream(youtubeUrl, { 
+      quality: 2,
+      discordPlayerCompatibility: true
     })
 
-    console.log('Converting to MP3...')
-    updateProgress(0, 'Starting conversion...')
+    const writeStream = require('fs').createWriteStream(inputPath)
+    
+    await new Promise((resolve, reject) => {
+      audioStream.stream.pipe(writeStream)
+      writeStream.on('finish', resolve)
+      writeStream.on('error', reject)
+    })
 
-    // Convert with progress
+    // Convert
+    updateProgress(50, 'Converting...')
     await new Promise((resolve, reject) => {
       ffmpeg(inputPath)
         .toFormat('mp3')
-        .audioBitrate(128)
-        .on('progress', (progress) => {
-          const percent = Math.floor(progress.percent || 0)
-          console.log(`Conversion progress: ${percent}%`)
-          updateProgress(percent, 'Converting...')
-        })
-        .on('end', () => {
-          console.log('Conversion completed')
-          resolve(null)
-        })
-        .on('error', (error) => {
-          console.error('Conversion error:', error)
-          reject(error)
-        })
+        .audioBitrate('128k')
+        .on('end', resolve)
+        .on('error', reject)
         .save(outputPath)
     })
 
-    console.log('Reading converted file...')
+    updateProgress(100, 'Complete!')
+
+    // Read the file
     const audioBuffer = await readFile(outputPath)
 
-    console.log('Cleaning up temporary files...')
+    // Cleanup
     await Promise.all([
-      unlink(inputPath).catch((error) => console.error('Error deleting input file:', error)),
-      unlink(outputPath).catch((error) => console.error('Error deleting output file:', error))
+      unlink(inputPath).catch(() => {}),
+      unlink(outputPath).catch(() => {})
     ])
 
-    console.log('Sending response...')
+    const filename = (videoInfo.video_details.title ?? 'audio')
+      .replace(/[^a-z0-9]/gi, '_')
+      .toLowerCase()
+
     return new NextResponse(audioBuffer, {
       headers: {
         'Content-Type': 'audio/mpeg',
-        'Content-Disposition': `attachment; filename="${sanitizedTitle}.mp3"`
+        'Content-Disposition': `attachment; filename="${filename}.mp3"`
       }
     })
+
   } catch (error) {
-    console.error('Conversion error details:', error)
+    console.error('Error:', error)
     return NextResponse.json({ 
       error: 'Conversion failed', 
       details: error instanceof Error ? error.message : 'Unknown error'

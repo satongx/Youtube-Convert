@@ -9,7 +9,7 @@ export function FileUploader({ onSuccess }: { onSuccess: (fileName: string) => v
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [progress, setProgress] = useState<number>(0)
   const [status, setStatus] = useState<string>('')
-  const [videoTitle, setVideoTitle] = useState<string>('')
+  const [error, setError] = useState<string | null>(null)
 
   const pollProgress = async () => {
     if (!isUploading) return
@@ -36,8 +36,15 @@ export function FileUploader({ onSuccess }: { onSuccess: (fileName: string) => v
     setProgress(0)
     setStatus('Starting...')
     setDownloadUrl(null)
+    setError(null)
 
     try {
+      // Validate YouTube URL format
+      const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/
+      if (!youtubeRegex.test(youtubeUrl)) {
+        throw new Error('Invalid YouTube URL format')
+      }
+
       // Start polling progress
       pollProgress()
 
@@ -53,23 +60,21 @@ export function FileUploader({ onSuccess }: { onSuccess: (fileName: string) => v
       
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Conversion failed')
+        throw new Error(errorData.details || errorData.error || 'Conversion failed')
       }
-
-      // Get filename from Content-Disposition header
-      const disposition = response.headers.get('Content-Disposition')
-      const filename = disposition?.split('filename=')[1]?.replace(/"/g, '') || 'audio.mp3'
-      setVideoTitle(filename)
 
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       setDownloadUrl(url)
-      onSuccess(filename)
+      
+      const videoId = youtubeUrl.split('v=')[1]?.split('&')[0] || 'video'
+      onSuccess(`${videoId}.mp3`)
+      setYoutubeUrl('')
       setStatus('Complete!')
       setProgress(100)
     } catch (error) {
       console.error('Conversion failed:', error)
-      alert(error instanceof Error ? error.message : 'Failed to convert video')
+      setError(error instanceof Error ? error.message : 'Failed to convert video')
       setStatus('Failed')
     } finally {
       setIsUploading(false)
@@ -80,11 +85,10 @@ export function FileUploader({ onSuccess }: { onSuccess: (fileName: string) => v
     if (!downloadUrl) return
     const a = document.createElement('a')
     a.href = downloadUrl
-    a.download = videoTitle || 'converted.mp3'
+    a.download = 'converted.mp3'
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    window.URL.revokeObjectURL(downloadUrl)
   }
 
   return (
@@ -107,12 +111,18 @@ export function FileUploader({ onSuccess }: { onSuccess: (fileName: string) => v
         </button>
       </form>
 
+      {error && (
+        <div className="text-red-500 text-center text-sm">
+          {error}
+        </div>
+      )}
+
       {isUploading && (
         <div className="text-center">
           <div className="text-sm text-gray-600 mb-2">
             {status} ({progress}%)
           </div>
-          <div className="w-full max-w-md mx-auto h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
             <div 
               className="h-full bg-blue-500 transition-all duration-300" 
               style={{ width: `${progress}%` }}

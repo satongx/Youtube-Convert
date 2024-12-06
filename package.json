@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@ffmpeg/ffmpeg": "^0.12.10",
     "@ffmpeg/util": "^0.12.1",
     "axios": "^1.7.9",
@@ -18,9 +19,9 @@
     "next": "^15.0.4",
     "os": "^0.1.2",
     "path": "^0.12.7",
+    "play-dl": "^1.9.7",
     "react": "19.0.0-rc-66855b96-20241106",
-    "react-dom": "19.0.0-rc-66855b96-20241106",
-    "ytdl-core": "^4.11.5"
+    "react-dom": "19.0.0-rc-66855b96-20241106"
   },
   "devDependencies": {
     "@types/fluent-ffmpeg": "^2.1.27",
