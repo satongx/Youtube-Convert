@@ -3,6 +3,7 @@ import { writeFile, unlink, readFile } from 'fs/promises'
 import ytdl from 'ytdl-core'
 import ffmpeg from 'fluent-ffmpeg'
 import { join } from 'path'
+import { updateProgress } from '@/app/lib/progress'
 
 export async function POST(request: Request) {
   try {
@@ -17,9 +18,6 @@ export async function POST(request: Request) {
     const inputPath = join('/tmp', `youtube-${Date.now()}.mp4`)
     const outputPath = join('/tmp', `${sanitizedTitle}.mp3`)
 
-    let downloadProgress = 0
-    let conversionProgress = 0
-
     // Download with progress
     await new Promise((resolve, reject) => {
       ytdl(youtubeUrl, {
@@ -27,8 +25,8 @@ export async function POST(request: Request) {
         filter: 'audioonly'
       })
         .on('progress', (_, downloaded, total) => {
-          downloadProgress = Math.floor((downloaded / total) * 100)
-          console.log(`Download Progress: ${downloadProgress}%`)
+          const progress = Math.floor((downloaded / total) * 100)
+          updateProgress(progress, 'Downloading...')
         })
         .pipe(require('fs').createWriteStream(inputPath))
         .on('finish', resolve)
@@ -40,11 +38,9 @@ export async function POST(request: Request) {
       ffmpeg(inputPath)
         .toFormat('mp3')
         .audioBitrate(128)
-        .audioChannels(2)
-        .audioFrequency(44100)
         .on('progress', (progress) => {
-          conversionProgress = Math.floor(progress.percent || 0)
-          console.log(`Conversion Progress: ${conversionProgress}%`)
+          const percent = Math.floor(progress.percent || 0)
+          updateProgress(percent, 'Converting...')
         })
         .on('end', resolve)
         .on('error', reject)
